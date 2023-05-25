@@ -238,15 +238,18 @@ const std::string OvmsVehicleVWeUp::GetFeature(int key)
 void OvmsVehicleVWeUp::ConfigChanged(OvmsConfigParam *param)
 {
   if (param && param->GetName() != "xvu") {
+      ESP_LOGI(TAG, "Param getname != xvu");
     return;
   }
 
   ESP_LOGD(TAG, "VW e-Up reload configuration");
+  ESP_LOGI(TAG, "VW e-Up reload configuration");
+
   int vweup_modelyear_new = MyConfig.GetParamValueInt("xvu", "modelyear", DEFAULT_MODEL_YEAR);
   bool vweup_enable_obd_new = MyConfig.GetParamValueBool("xvu", "con_obd", true);
   bool vweup_enable_t26_new = MyConfig.GetParamValueBool("xvu", "con_t26", true);
   vweup_enable_write = MyConfig.GetParamValueBool("xvu", "canwrite", false);
-  vweup_cc_temp_int = MyConfig.GetParamValueInt("xvu", "cc_temp", 22);
+  int vweup_cc_temp_int_new = MyConfig.GetParamValueInt("xvu", "cc_temp", 22);
   int dc_interval = MyConfig.GetParamValueInt("xvu", "dc_interval", 0);
   int cell_interval_drv = MyConfig.GetParamValueInt("xvu", "cell_interval_drv", 15);
   int cell_interval_chg = MyConfig.GetParamValueInt("xvu", "cell_interval_chg", 60);
@@ -337,9 +340,18 @@ void OvmsVehicleVWeUp::ConfigChanged(OvmsConfigParam *param)
   }
 
   // Init T26 subsystem:
-  if (vweup_enable_t26) {
+  if (vweup_enable_t26 && do_obd_init) {
+    ESP_LOGI(TAG, "Initializing T26 inside ConfigChanged");
     T26Init();
   }
+
+  if (vweup_cc_temp_int_new != vweup_cc_temp_int){
+    vweup_cc_temp_int = vweup_cc_temp_int_new;
+    ESP_LOGI(TAG, "CC_temp parameter changed in ConfigChanged");
+    if (vweup_enable_t26){
+      CCTempSet();}
+  }
+  
 
 #ifdef CONFIG_OVMS_COMP_WEBSERVER
   // Init Web subsystem:

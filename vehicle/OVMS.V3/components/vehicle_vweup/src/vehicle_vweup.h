@@ -262,8 +262,11 @@ public:
   void CCOn();
   void CCOnP();
   void CCOff();
+  void CCTempSet();
   static void ccCountdown(TimerHandle_t timer);
   static void sendOcuHeartbeat(TimerHandle_t timer);
+  void StartCharget26();
+  void StopCharget26();
 
 private:
   void SendCommand(RemoteCommand);
@@ -331,7 +334,7 @@ protected:
 
 public:
   static void ShellPollControl(int verbosity, OvmsWriter* writer, OvmsCommand* cmd, int argc, const char* const* argv);
-
+ 
 protected:
   OvmsMetricFloat *MotElecSoCAbs;                 // Absolute SoC of main battery from motor electrics ECU
   OvmsMetricFloat *MotElecSoCNorm;                // Normalized SoC of main battery from motor electrics ECU

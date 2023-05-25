@@ -126,12 +126,19 @@
 static const char *TAG = "v-vweup";
 
 #include <stdio.h>
+#include <string.h>
 #include "pcp.h"
 #include "vehicle_vweup.h"
 #include "vweup_t26.h"
 #include "metrics_standard.h"
 #include "ovms_events.h"
 #include "ovms_metrics.h"
+
+#include <time.h>
+uint8_t length_Settings = 43;
+uint8_t count_Settings = 0;
+bool recieving_active = False;
+uint8_t Settings[length_Settings];
 
 void OvmsVehicleVWeUp::sendOcuHeartbeat(TimerHandle_t timer)
 {
@@ -624,7 +631,19 @@ void OvmsVehicleVWeUp::IncomingFrameCan3(CAN_frame_t *p_frame)
         break;
       }
       break;
-
+    case 0x69C:
+      ESP_LOGD(TAG, "69C Recieved");
+      if((d[0] == 0x80 || d[0] == 0x90) && d[4]== 0x11{
+        recieving_active = True;
+      }
+      if (recieving_active)
+      {
+        saveSettings(d);
+      }
+      else
+      {
+        ESP_LOGD(TAG, "69C Not Relevent");
+      }
     default:
       // This will log all unknown incoming frames
       // ESP_LOGD(TAG, "IFC %03x 8 %02x %02x %02x %02x %02x %02x %02x %02x", p_frame->MsgID, d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]);
@@ -926,9 +945,7 @@ void OvmsVehicleVWeUp::CCCountdown()
 {
   cc_count++;
   ocu_wait = true;
-  if (cc_count == 5) {
-    CCOnP(); // This is weird. We first need to send a Climate Contol Off before it will turn on ???
-  }
+
   if (cc_count == 10) {
     CCOn();
     xTimerStop(m_ccCountdown, 0);
@@ -940,16 +957,13 @@ void OvmsVehicleVWeUp::CCCountdown()
   }
 }
 
-void OvmsVehicleVWeUp::CCOn()
+
+void OvmsVehicleVWeUp::CCOn() //To turn the Climate Control ON
 {
-  if (!IsT26Ready()) {
+    if (!IsT26Ready()) {
     ESP_LOGE(TAG, "CCOn: T26 not ready");
     return;
   }
-
-  unsigned char data[8];
-  uint8_t length;
-  length = 8;
 
   unsigned char data_s[4];
   uint8_t length_s;
@@ -957,6 +971,37 @@ void OvmsVehicleVWeUp::CCOn()
 
   canbus *comfBus;
   comfBus = m_can3;
+
+  data_s[0] = 0x29;
+  data_s[1] = 0x58;
+  data_s[2] = 0x00;
+  data_s[3] = 0x01;
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length_s, data_s);
+  }
+  
+  ESP_LOGI(TAG, "Climate Control On Messages to Comfort CAN.");
+  vweup_cc_on = true;
+  vweup_cc_turning_on = false;
+  StandardMetrics.ms_v_env_charging12v->SetValue(true);
+  StandardMetrics.ms_v_env_aux12v->SetValue(true);
+}
+
+void OvmsVehicleVWeUp::CCTempSet() //to send the can message to set the configured cabin temperature
+{
+  if (!IsT26Ready()) {
+    ESP_LOGE(TAG, "CCOn: T26 not ready");
+    return;
+  }
+  
+  ESP_LOGI(TAG, "CCTempSet called");
+  uint8_t length = 8;
+  unsigned char data[length];
+
+  canbus *comfBus;
+  comfBus = m_can3;
+
+  unsigned int TempValue = (vweup_cc_temp_int-10)*10; 
 
   data[0] = 0x60;
   data[1] = 0x16;
@@ -1001,105 +1046,7 @@ void OvmsVehicleVWeUp::CCOn()
   data[3] = 0xFF;
   data[4] = 0xFF;
   data[5] = 0x01;
-  data[6] = 0x78; // This is the target temperature. T = 10 + d6/10
-
-  if (vweup_cc_temp_int == 15) {
-    data[6] = 0x32;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 15");
-    }
-  }
-  if (vweup_cc_temp_int == 16) {
-    data[6] = 0x3C;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 16");
-    }
-  }
-  if (vweup_cc_temp_int == 17) {
-    data[6] = 0x46;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 17");
-    }
-  }
-  if (vweup_cc_temp_int == 18) {
-    data[6] = 0x50;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 18");
-    }
-  }
-  if (vweup_cc_temp_int == 19) {
-    data[6] = 0x5A;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 19");
-    }
-  }
-  if (vweup_cc_temp_int == 20) {
-    data[6] = 0x64;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 20");
-    }
-  }
-  if (vweup_cc_temp_int == 21) {
-    data[6] = 0x6E;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 21");
-    }
-  }
-  if (vweup_cc_temp_int == 22) {
-    data[6] = 0x78;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 22");
-    }
-  }
-  if (vweup_cc_temp_int == 23) {
-    data[6] = 0x82;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 23");
-    }
-  }
-  if (vweup_cc_temp_int == 24) {
-    data[6] = 0x8C;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 24");
-    }
-  }
-  if (vweup_cc_temp_int == 25) {
-    data[6] = 0x96;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 25");
-    }
-  }
-  if (vweup_cc_temp_int == 26) {
-    data[6] = 0xA0;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 26");
-    }
-  }
-  if (vweup_cc_temp_int == 27) {
-    data[6] = 0xAA;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 27");
-    }
-  }
-  if (vweup_cc_temp_int == 28) {
-    data[6] = 0xB4;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 28");
-    }
-  }
-  if (vweup_cc_temp_int == 29) {
-    data[6] = 0xBE;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 29");
-    }
-  }
-  if (vweup_cc_temp_int == 30) {
-    data[6] = 0xC8;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 30");
-    }
-  }
-
+  data[6] = TempValue; // This is the target temperature. T = 10 + d6/10
   data[7] = 0x00;
   if (vweup_enable_write && !dev_mode) {
     comfBus->WriteStandard(0x69E, length, data);
@@ -1141,19 +1088,12 @@ void OvmsVehicleVWeUp::CCOn()
     comfBus->WriteStandard(0x5A7, length, data);
   }
 
-  data_s[0] = 0x29;
-  data_s[1] = 0x58;
-  data_s[2] = 0x00;
-  data_s[3] = 0x01;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length_s, data_s);
-  }
-
   ESP_LOGI(TAG, "Wrote second stage Climate Control On Messages to Comfort CAN.");
   vweup_cc_on = true;
   vweup_cc_turning_on = false;
   StandardMetrics.ms_v_env_charging12v->SetValue(true);
   StandardMetrics.ms_v_env_aux12v->SetValue(true);
+
 }
 
 void OvmsVehicleVWeUp::CCOnP()
@@ -1370,6 +1310,33 @@ void OvmsVehicleVWeUp::CCOnP()
 
 void OvmsVehicleVWeUp::CCOff()
 {
+    if (!IsT26Ready()) {
+    ESP_LOGE(TAG, "CCOff: T26 not ready");
+    return;
+  }
+
+  unsigned char data_s[4];
+  uint8_t length_s;
+  length_s = 4;
+
+  canbus *comfBus;
+  comfBus = m_can3;
+
+  data_s[0] = 0x29;
+  data_s[1] = 0x58;
+  data_s[2] = 0x00;
+  data_s[3] = 0x00;
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length_s, data_s);
+  }
+
+  ESP_LOGI(TAG, "Wrote Climate Control Off Message to Comfort CAN.");
+  vweup_cc_on = false;
+
+}
+
+/*void OvmsVehicleVWeUp::CCOff()
+{
   if (!IsT26Ready()) {
     ESP_LOGE(TAG, "CCOff: T26 not ready");
     return;
@@ -1550,6 +1517,264 @@ void OvmsVehicleVWeUp::CCOff()
 
   ESP_LOGI(TAG, "Wrote Climate Control Off Message to Comfort CAN.");
   vweup_cc_on = false;
+}*/
+
+void savesettings(uint8_t *data)
+{
+  for (int i = 0; i<8; i++)
+  {
+    if((count + i)< length_Settings)
+    {
+    settings[count+i] = d[i];
+    
+    }
+  }
+  if (count == length_Settings)
+  {
+    recieving_active = False;
+    for(int i = 0; i <= length_Settings; i++ )
+    {
+      ESP_LOGD(TAG, "Recieved response from CCan %x", Settings[i]);
+    }
+    
+  }
+}
+
+void OvmsVehicleVWeUp::StartCharget26()
+{
+    if (!IsT26Ready()) {
+    ESP_LOGE(TAG, "CCOn: T26 not ready");
+    return;
+  }
+
+  uint8_t length = 8;
+  unsigned char data[length];
+
+  canbus *comfBus;
+  comfBus = m_can3;
+  
+  data[0] = 0x80;
+  data[1] = 0x04;
+  data[2] = 0x19;
+  data[3] = 0x59;
+  data[4] = 0x11;
+  data[5] = 0x00;
+  data[6] = 0x00;
+  data[7] = 0x04;
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length_s, data_s);
+  }
+
+  // read response probably happening automatically
+
+  //add delay
+  clock_t start_time = clock();
+  int milli_seconds = 1000;
+  while (clock() < start_time + milli_seconds || !recieve_complete)
+    ;
+
+  //send the changed settings
+  if (recieve_complete)
+  {
+  data[0] = Settings[0];
+  data[1] = Settings[1];
+  data[2] = 0x29;
+  data[3] = Settings[3];
+  data[4] = Settings[4];
+  data[5] = Settings[5];
+  data[6] = Settings[6];
+  data[7] = Settings[7];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  data[0] = Settings[8];
+  data[1] = Settings[9];
+  data[2] = 0x05;
+  data[3] = Settings[11];
+  data[4] = Settings[12];
+  data[5] = Settings[13];
+  data[6] = Settings[14];
+  data[7] = Settings[15];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  data[0] = Settings[16];
+  data[1] = Settings[17];
+  data[2] = Settings[18];
+  data[3] = Settings[19];
+  data[4] = Settings[20];
+  data[5] = Settings[21];
+  data[6] = Settings[22];
+  data[7] = Settings[23];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+  data[0] = Settings[24];
+  data[1] = Settings[25];
+  data[2] = Settings[26];
+  data[3] = Settings[27];
+  data[4] = Settings[28];
+  data[5] = Settings[29];
+  data[6] = Settings[30];
+  data[7] = Settings[31];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+  data[0] = Settings[32];
+  data[1] = Settings[33];
+  data[2] = Settings[34];
+  data[3] = Settings[35];
+  data[4] = Settings[36];
+  data[5] = Settings[37];
+  data[6] = Settings[38];
+  data[7] = Settings[39];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  uint8_t length = 3;
+  unsigned char data[length];
+
+  data[0] = Settings[40];
+  data[1] = Settings[41];
+  data[2] = Settings[42];
+
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  uint8_t length_s = 4;
+  unsigned char data_s[length_s];
+
+  data_s[0] = 0x29;
+  data_s[1] = 0x58;
+  data_s[2] = 0x00;
+  data_s[3] = 0x01;
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length_s, data_s);
+  }
+  }
+
+}
+void OvmsVehicleVWeUp::StopCharget26()
+{
+    if (!IsT26Ready()) {
+    ESP_LOGE(TAG, "CCOn: T26 not ready");
+    return;
+  }
+
+  uint8_t length = 8;
+  unsigned char data[length];
+
+  canbus *comfBus;
+  comfBus = m_can3;
+  
+  data[0] = 0x80;
+  data[1] = 0x04;
+  data[2] = 0x19;
+  data[3] = 0x59;
+  data[4] = 0x11;
+  data[5] = 0x00;
+  data[6] = 0x00;
+  data[7] = 0x04;
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length_s, data_s);
+  }
+
+  // read response probably happening automatically
+
+  //add delay
+  clock_t start_time = clock();
+  int milli_seconds = 1000;
+  while (clock() < start_time + milli_seconds || !recieve_complete)
+    ;
+
+  //send the changed settings
+  if (recieve_complete)
+  {
+  data[0] = Settings[0];
+  data[1] = Settings[1];
+  data[2] = 0x29;         //write command
+  data[3] = Settings[3];
+  data[4] = Settings[4];
+  data[5] = Settings[5];
+  data[6] = Settings[6];
+  data[7] = Settings[7];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  data[0] = Settings[8];
+  data[1] = Settings[9];
+  data[2] = 0x06;           //turn off
+  data[3] = Settings[11];
+  data[4] = Settings[12];
+  data[5] = Settings[13];
+  data[6] = Settings[14];
+  data[7] = Settings[15];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  data[0] = Settings[16];
+  data[1] = Settings[17];
+  data[2] = Settings[18];
+  data[3] = Settings[19];
+  data[4] = Settings[20];
+  data[5] = Settings[21];
+  data[6] = Settings[22];
+  data[7] = Settings[23];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+  data[0] = Settings[24];
+  data[1] = Settings[25];
+  data[2] = Settings[26];
+  data[3] = Settings[27];
+  data[4] = Settings[28];
+  data[5] = Settings[29];
+  data[6] = Settings[30];
+  data[7] = Settings[31];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+  data[0] = Settings[32];
+  data[1] = Settings[33];
+  data[2] = Settings[34];
+  data[3] = Settings[35];
+  data[4] = Settings[36];
+  data[5] = Settings[37];
+  data[6] = Settings[38];
+  data[7] = Settings[39];
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  uint8_t length = 3;
+  unsigned char data[length];
+
+  data[0] = Settings[40];
+  data[1] = Settings[41];
+  data[2] = Settings[42];
+
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length, data);
+  }
+
+  uint8_t length_s = 4;
+  unsigned char data_s[length_s];
+
+  data_s[0] = 0x29;
+  data_s[1] = 0x58;
+  data_s[2] = 0x00;
+  data_s[3] = 0x01;
+  if (vweup_enable_write && !dev_mode) {
+    comfBus->WriteStandard(0x69E, length_s, data_s);
+  }
+  }
+
 }
 
 OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandLock(const char *pin)
@@ -1583,6 +1808,7 @@ OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandDeactivateValet(const ch
 OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandStartCharge()
 {
   ESP_LOGI(TAG, "CommandStartCharge");
+  //StartCharget26();
   // fallback to default implementation:
   return OvmsVehicle::CommandStartCharge();
 }
@@ -1590,6 +1816,7 @@ OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandStartCharge()
 OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandStopCharge()
 {
   ESP_LOGI(TAG, "CommandStopCharge");
+  //StopCharget26();
   // fallback to default implementation:
   return OvmsVehicle::CommandStopCharge();
 }
