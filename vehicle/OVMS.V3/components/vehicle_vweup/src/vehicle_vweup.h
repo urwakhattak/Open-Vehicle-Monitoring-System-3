@@ -132,6 +132,7 @@ public:
   vehicle_command_t CommandUnlock(const char *pin);
   vehicle_command_t CommandStartCharge();
   vehicle_command_t CommandStopCharge();
+  vehicle_command_t CommandSetChargeCurrent(uint16_t limit);
   vehicle_command_t CommandActivateValet(const char *pin);
   vehicle_command_t CommandDeactivateValet(const char *pin);
   vehicle_command_t CommandWakeup();
@@ -256,6 +257,8 @@ protected:
 protected:
   void IncomingFrameCan3(CAN_frame_t *p_frame);
 
+
+
 public:
   void SendOcuHeartbeat();
   void CCCountdown();
@@ -265,8 +268,14 @@ public:
   void CCTempSet();
   static void ccCountdown(TimerHandle_t timer);
   static void sendOcuHeartbeat(TimerHandle_t timer);
-  void StartCharget26();
-  void StopCharget26();
+  bool StartCharget26();
+  bool StopCharget26();
+  void SetChargeCurrent(uint16_t limit);
+  void RequestProfile_0(uint8_t *data);
+  void WriteProfile_0(uint8_t key , uint8_t value);
+  void ResetProfile_0();
+
+
 
 private:
   void SendCommand(RemoteCommand);
@@ -298,6 +307,20 @@ public:
   int fas_counter_on;
   int fas_counter_off;
   bool dev_mode;
+  //for reading the settings funcationality
+  static const int length_settings = 48;
+  int count_settings;
+  int vweup_charge_current;
+  bool recieving_active;
+  uint8_t recieve_channel;
+  uint8_t first_char;
+  uint8_t settings[length_settings];
+  bool Set_C_Current_flag;
+
+
+  //for values read from profile by read steeings function
+  uint8_t  read_cc_temp;
+  uint8_t  read_charge_current;
 
 private:
   RemoteCommand vweup_remote_command; // command to send, see RemoteCommandTimer()

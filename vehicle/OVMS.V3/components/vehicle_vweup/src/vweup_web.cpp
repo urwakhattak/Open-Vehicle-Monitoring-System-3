@@ -83,6 +83,7 @@ void OvmsVehicleVWeUp::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
   std::string error, warn;
   bool do_reload = false;
 
+
   if (c.method == "POST")
   {
     // process form submission:
@@ -96,7 +97,11 @@ void OvmsVehicleVWeUp::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     nmap["cell_interval_awk"] = c.getvar("cell_interval_awk");
     nmap["bat.soh.source"] = c.getvar("bat.soh.source");
     nmap["ctp.maxpower"] = c.getvar("ctp_maxpower");
-    nmap["ctp.soclimit"] = c.getvar("ctp_soclimit");
+    nmap["chg_soclimit"] = c.getvar("chg_soclimit");
+    nmap["chg_autostop"] = (c.getvar("chg_autostop") == "yes") ? "yes" : "no";
+    nmap["chg_climit"] = c.getvar("chg_climit");
+
+
 
     // check:
     if (nmap["modelyear"] != "")
@@ -123,6 +128,7 @@ void OvmsVehicleVWeUp::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
 
       // store:
       MyConfig.SetParamMap("xvu", nmap);
+
 
       c.head(200);
       c.alert("success", "<p class=\"lead\">VW e-Up feature configuration saved.</p>");
@@ -184,16 +190,27 @@ void OvmsVehicleVWeUp::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
   c.fieldset_end();
 
   c.fieldset_start("Charge Time Prediction");
+    c.input_checkbox("Charge stop when maximum SOC limit reached", "chg_autostop", strtobool(nmap["chg_autostop"]),
+    "<p>Controls if the charge stops at SoC limit or if only a notification is issued</p>");
+  c.fieldset_end();
+
   c.input_slider("Default power limit", "ctp_maxpower", 3, "kW",
     -1, nmap["ctp.maxpower"].empty() ? 0 : std::stof(nmap["ctp.maxpower"]),
     0, 0, 30, 0.1,
     "<p>Used while not charging, default 0 = unlimited (except by car).</p>"
     "<p>Note: this needs to be the power level at the battery, i.e. after losses.</p>"
     "<p>Typical values: 6.5 kW for 2-phase charging, 3.2 kW for 1-phase, 2 kW for ICCB/Schuko.</p>");
-  c.input_slider("Default SOC limit", "ctp_soclimit", 3, "%",
-    -1, nmap["ctp.soclimit"].empty() ? 80 : std::stof(nmap["ctp.soclimit"]),
-    80, 10, 100, 5,
+
+  c.input_slider("Default SOC limit", "chg_soclimit", 3, "%",
+    -1, nmap["chg_soclimit"].empty() ? 80 : std::stof(nmap["chg_soclimit"]),
+    80, 10, 100, 1,
     "<p>Used if no timer mode limits are available, i.e. without OBD connection or without timer schedule.</p>");
+
+  c.input_slider("Charging Current Value", "chg_climit", 3, "Amps",
+    -1, nmap["chg_climit"].empty()? 16 : std::stof(nmap["chg_climit"]),
+    16, 6, 16, 1,
+    "<p>Charging current limit Value between 6 - 16 Amps .</p>");
+
   c.fieldset_end();
 
   c.fieldset_start("Battery Health", "needs-con-obd");
@@ -254,17 +271,23 @@ void OvmsVehicleVWeUp::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
 void OvmsVehicleVWeUp::WebCfgClimate(PageEntry_t &p, PageContext_t &c)
 {
   std::string error;
-  std::string cc_temp;
+  //std::string cc_temp;
+
+  ConfigParamMap pmap = MyConfig.GetParamMap("xvu");
+  ConfigParamMap nmap = pmap;
+
 
   if (c.method == "POST")
   {
     // process form submission:
-    cc_temp = c.getvar("cc_temp");
+    nmap["cc_temp"] = c.getvar("cc_temp");
+    nmap["cc_onbat"] = (c.getvar("cc_onbat") == "yes") ? "yes" : "no";
 
     if (error == "")
     {
       // store:
-      MyConfig.SetParamValue("xvu", "cc_temp", cc_temp);
+      //MyConfig.SetParamValue("xvu", "cc_temp", cc_temp);
+      MyConfig.SetParamMap("xvu", nmap);
 
       c.head(200);
       c.alert("success", "<p class=\"lead\">VW e-Up climate control configuration saved.</p>");
@@ -280,7 +303,8 @@ void OvmsVehicleVWeUp::WebCfgClimate(PageEntry_t &p, PageContext_t &c)
   else
   {
     // read configuration:
-    cc_temp = MyConfig.GetParamValue("xvu", "cc_temp", "21");
+    //cc_temp = MyConfig.GetParamValue("xvu", "cc_temp", "21");
+
 
     c.head(200);
   }
@@ -297,9 +321,14 @@ void OvmsVehicleVWeUp::WebCfgClimate(PageEntry_t &p, PageContext_t &c)
   c.fieldset_start("Climate control");
 
   c.input_slider("Cabin target temperature", "cc_temp", 3, "&#8451;",
-    -1, cc_temp.empty() ? 22 : atof(cc_temp.c_str()),
+    -1, nmap["cc_temp"].empty() ? 22 : std::stof(nmap["cc_temp"]),
     22, 15, 30, 1,
     "<p>Default 22 &#8451;, 15=Lo, 30=Hi.</p><br><p>This parameter can also be set in the app under FEATURES 21.</p>");
+  
+  c.fieldset_start("CC on Battery");
+  c.input_checkbox("Check to enable Climate Control on Battery", "cc_onbat", strtobool(nmap["cc_onbat"]),
+    "<p>This parameter can also be set in the app under FEATURES 23.</p>");
+  c.fieldset_end();
 
   c.input_button("default", "Save");
   c.form_end();
