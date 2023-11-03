@@ -159,8 +159,7 @@ void OvmsVehicleVWeUp::RequestProfile_0(uint8_t *data)
     read_charge_current = settings[13];
     read_cc_temp = (settings[25]/10)+10;
     recieving_active = false;
-    ESP_LOGI(TAG, " REQUESTPROFILE_0 FUNC: with Read_charge_current = %d and read_cc_temp = %d", read_charge_current,read_cc_temp);
-
+    ESP_LOGD(TAG, "RequestProfile_0: with Read_charge_current = %d and read_cc_temp = %d", read_charge_current,read_cc_temp);
 
    }
 }
@@ -171,7 +170,7 @@ void OvmsVehicleVWeUp::WriteProfile_0(uint8_t key , uint8_t value)
 {
   CommandWakeup(); //wakeup the vehicle to be able to communicate with all the ECUs
   
-    ESP_LOGI(TAG, " CUSTOM FUNCTION FOR CHANGING SETTINGS");
+    ESP_LOGI(TAG, "WriteProfile_0 function called");
 
     uint8_t length = 8;
     unsigned char data[length];
@@ -190,7 +189,7 @@ void OvmsVehicleVWeUp::WriteProfile_0(uint8_t key , uint8_t value)
     if (vweup_enable_write && !dev_mode) {
       comfBus->WriteStandard(0x69E, length, data);
     }
-     ESP_LOGI(TAG, " Read message sent in WriteProfile_0 function");
+     ESP_LOGD(TAG, "Read message sent in WriteProfile_0 function");
 
     // read response happening automatically
 
@@ -202,7 +201,7 @@ void OvmsVehicleVWeUp::WriteProfile_0(uint8_t key , uint8_t value)
 
     for(int i = 0; i < length_settings; i+=8 )
     {
-      ESP_LOGI(TAG, "RequestProfile_0: %02x %02x %02x %02x %02x %02x %02x %02x", settings[i+0], settings[i+1], settings[i+2], settings[i+3],settings[i+4], settings[i+5], settings[i+6], settings[i+7]);
+      ESP_LOGD(TAG, "Current Profile_0: %02x %02x %02x %02x %02x %02x %02x %02x", settings[i+0], settings[i+1], settings[i+2], settings[i+3],settings[i+4], settings[i+5], settings[i+6], settings[i+7]);
     }
 
       //send the changed settings
@@ -210,7 +209,6 @@ void OvmsVehicleVWeUp::WriteProfile_0(uint8_t key , uint8_t value)
 
     if(settings[13] != 0 && settings[14] != 0)// && ((key == 21) ? (settings[13] == value) : false))
     {
-      ESP_LOGI(TAG, " Sending the settings");
       data[0] = 0x90;
       data[1] = 0x20;
       data[2] = 0x29;
@@ -280,7 +278,7 @@ void OvmsVehicleVWeUp::ResetProfile_0()
 {
     CommandWakeup(); //wakeup the vehicle to be able to communicate with all the ECUs
   
-    ESP_LOGI(TAG, " CUSTOM FUNCTION FOR CHANGING SETTINGS");
+    ESP_LOGI(TAG, "ResetProfile_0 function called"); //Default Profile value incase of wrong write values and the entire profile needs to be reset
 
     uint8_t length = 8;
     unsigned char data[length];
@@ -291,7 +289,7 @@ void OvmsVehicleVWeUp::ResetProfile_0()
     for(int i = 0; i < 3; i++)
     {
 
-      ESP_LOGI(TAG, " Resetting Profile zero");
+      ESP_LOGI(TAG, "Resetting Profile_0");
       data[0] = 0x80;
       data[1] = 0x20;
       data[2] = 0x29;
@@ -899,7 +897,6 @@ void OvmsVehicleVWeUp::IncomingFrameCan3(CAN_frame_t *p_frame)
         }
         recieving_active = true;
         count_settings = 0;
-        ESP_LOGI(TAG, "In 1st condition d[0] = 80/90");
         RequestProfile_0(d);
         }
       if (recieving_active)
@@ -908,26 +905,18 @@ void OvmsVehicleVWeUp::IncomingFrameCan3(CAN_frame_t *p_frame)
           if(recieve_channel == 1 && (d[0] & 0xF0) == 0xC0)
           {           
             RequestProfile_0(d);
-            ESP_LOGI(TAG, "In 2nd & 3rd condition d[0] = %x and channel = %d",d[0],recieve_channel);
-
           }
           else if(recieve_channel == 2 && (d[0] & 0xF0) == 0xD0)
           {           
             RequestProfile_0(d);
-            ESP_LOGI(TAG, "In 2nd & 3rd condition d[0] = %x and channel = %d",d[0],recieve_channel);
-
           }
           else if(recieve_channel == 3 && (d[0] & 0xF0) == 0xE0)
           {           
             RequestProfile_0(d);
-            ESP_LOGI(TAG, "In 2nd & 3rd condition d[0] = %x and channel = %d",d[0],recieve_channel);
-
           }
           else if(recieve_channel == 4 && (d[0] & 0xF0) == 0xF0)
           {           
             RequestProfile_0(d);
-            ESP_LOGI(TAG, "In 2nd & 3rd condition d[0] = %x and channel = %d",d[0],recieve_channel);
-
           }        
 
       }
@@ -1322,81 +1311,6 @@ void OvmsVehicleVWeUp::CCTempSet() //to send the can message to set the configur
   WriteProfile_0(22,TempValue); // key twenty-two for climiate control tempertaure in basic configuration (check Multiplex PID Document)
 
 
-  // Old Code used repeatedly so made into a function WriteProfile_0(); 
-  /*
-
-  data[0] = 0x60;
-  data[1] = 0x16;
-  data[2] = 0x00;
-  data[3] = 0x00;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x5A7, length, data);
-  }
-
-  // d5 could be a counter?
-  data[0] = 0x80;
-  data[1] = 0x20;
-  data[2] = 0x29;
-  data[3] = 0x59;
-  data[4] = 0x21;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x01;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC0;
-  data[1] = 0x06;
-  data[2] = 0x00;
-  data[3] = 0x10;
-  data[4] = 0x1E;
-  data[5] = 0xFF;
-  data[6] = 0xFF;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC1;
-  data[1] = 0xFF;
-  data[2] = 0xFF;
-  data[3] = 0xFF;
-  data[4] = 0xFF;
-  data[5] = 0x01;
-  data[6] = TempValue; // This is the target temperature. T = 10 + d6/10
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC2;
-  data[1] = 0x1E;
-  data[2] = 0x1E;
-  data[3] = 0x0A;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x08;
-  data[7] = 0x4F;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC3;
-  data[1] = 0x70;
-  data[2] = 0x74;
-  data[3] = 0x69;
-  data[4] = 0x6F;
-  data[5] = 0x6E;
-  data[6] = 0x65;
-  data[7] = 0x6E;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }*/
   uint8_t length = 8;
   unsigned char data[length];
 
@@ -1428,218 +1342,6 @@ void OvmsVehicleVWeUp::CCTempSet() //to send the can message to set the configur
     ESP_LOGE(TAG, "CCTempSet: Failed to set CC temp to %d",read_cc_temp);
   }
 
-}
-
-void OvmsVehicleVWeUp::CCOnP()
-{
-  if (!IsT26Ready()) {
-    ESP_LOGE(TAG, "CCOnP: T26 not ready");
-    return;
-  }
-
-  unsigned char data[8];
-  uint8_t length;
-  length = 8;
-
-  unsigned char data_s[4];
-  uint8_t length_s;
-  length_s = 4;
-
-  canbus *comfBus;
-  comfBus = m_can3;
-
-  data[0] = 0x60;
-  data[1] = 0x16;
-  data[2] = 0x00;
-  data[3] = 0x00;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x5A7, length, data);
-  }
-
-  // d5 could be a counter
-  data[0] = 0x80;
-  data[1] = 0x20;
-  data[2] = 0x29;
-  data[3] = 0x59;
-  data[4] = 0x22;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x01;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0x60;
-  data[1] = 0x16;
-  data[2] = 0x00;
-  data[3] = 0x00;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x5A7, length, data);
-  }
-
-  data[0] = 0xC0;
-  data[1] = 0x06;
-  data[2] = 0x00;
-  data[3] = 0x10;
-  data[4] = 0x1E;
-  data[5] = 0xFF;
-  data[6] = 0xFF;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC1;
-  data[1] = 0xFF;
-  data[2] = 0xFF;
-  data[3] = 0xFF;
-  data[4] = 0xFF;
-  data[5] = 0x01;
-  data[6] = 0x78; // This is the target temperature. T = 10 + d6/10
-
-  if (vweup_cc_temp_int == 15) {
-    data[6] = 0x32;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 15");
-    }
-  }
-  if (vweup_cc_temp_int == 16) {
-    data[6] = 0x3C;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 16");
-    }
-  }
-  if (vweup_cc_temp_int == 17) {
-    data[6] = 0x46;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 17");
-    }
-  }
-  if (vweup_cc_temp_int == 18) {
-    data[6] = 0x50;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 18");
-    }
-  }
-  if (vweup_cc_temp_int == 19) {
-    data[6] = 0x5A;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 19");
-    }
-  }
-  if (vweup_cc_temp_int == 20) {
-    data[6] = 0x64;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 20");
-    }
-  }
-  if (vweup_cc_temp_int == 21) {
-    data[6] = 0x6E;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 21");
-    }
-  }
-  if (vweup_cc_temp_int == 22) {
-    data[6] = 0x78;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 22");
-    }
-  }
-  if (vweup_cc_temp_int == 23) {
-    data[6] = 0x82;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 23");
-    }
-  }
-  if (vweup_cc_temp_int == 24) {
-    data[6] = 0x8C;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 24");
-    }
-  }
-  if (vweup_cc_temp_int == 25) {
-    data[6] = 0x96;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 25");
-    }
-  }
-  if (vweup_cc_temp_int == 26) {
-    data[6] = 0xA0;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 26");
-    }
-  }
-  if (vweup_cc_temp_int == 27) {
-    data[6] = 0xAA;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 27");
-    }
-  }
-  if (vweup_cc_temp_int == 28) {
-    data[6] = 0xB4;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 28");
-    }
-  }
-  if (vweup_cc_temp_int == 29) {
-    data[6] = 0xBE;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 29");
-    }
-  }
-  if (vweup_cc_temp_int == 30) {
-    data[6] = 0xC8;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 30");
-    }
-  }
-
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC2;
-  data[1] = 0x1E;
-  data[2] = 0x1E;
-  data[3] = 0x0A;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x08;
-  data[7] = 0x4F;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC3;
-  data[1] = 0x70;
-  data[2] = 0x74;
-  data[3] = 0x69;
-  data[4] = 0x6F;
-  data[5] = 0x6E;
-  data[6] = 0x65;
-  data[7] = 0x6E;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data_s[0] = 0x29;
-  data_s[1] = 0x58;
-  data_s[2] = 0x00;
-  data_s[3] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length_s, data_s);
-  }
-
-  ESP_LOGI(TAG, "Wrote first stage Climate Control On Messages to Comfort CAN.");
 }
 
 void OvmsVehicleVWeUp::CCOff()
@@ -1686,192 +1388,6 @@ void OvmsVehicleVWeUp::CCOff()
 
 }
 
-/*void OvmsVehicleVWeUp::CCOff()
-{
-  if (!IsT26Ready()) {
-    ESP_LOGE(TAG, "CCOff: T26 not ready");
-    return;
-  }
-
-  unsigned char data[8];
-  uint8_t length;
-  length = 8;
-
-  unsigned char data_s[4];
-  uint8_t length_s;
-  length_s = 4;
-
-  canbus *comfBus;
-  comfBus = m_can3;
-
-  data[0] = 0x60;
-  data[1] = 0x16;
-  data[2] = 0x00;
-  data[3] = 0x00;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x5A7, length, data);
-  }
-
-  // d5 could be a counter
-  data[0] = 0x80;
-  data[1] = 0x20;
-  data[2] = 0x29;
-  data[3] = 0x59;
-  data[4] = 0x22;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x01;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0x60;
-  data[1] = 0x16;
-  data[2] = 0x00;
-  data[3] = 0x00;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x00;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x5A7, length, data);
-  }
-
-  data[0] = 0xC0;
-  data[1] = 0x06;
-  data[2] = 0x00;
-  data[3] = 0x10;
-  data[4] = 0x1E;
-  data[5] = 0xFF;
-  data[6] = 0xFF;
-  data[7] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC1;
-  data[1] = 0xFF;
-  data[2] = 0xFF;
-  data[3] = 0xFF;
-  data[4] = 0xFF;
-  data[5] = 0x01;
-  data[6] = 0x78; // This is the target temperature. T = 10 + d6/10
-
-  if (vweup_cc_temp_int == 19) {
-    data[6] = 0x5A;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 19");
-    }
-  }
-  if (vweup_cc_temp_int == 20) {
-    data[6] = 0x64;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 20");
-    }
-  }
-  if (vweup_cc_temp_int == 21) {
-    data[6] = 0x6E;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 21");
-    }
-  }
-  if (vweup_cc_temp_int == 22) {
-    data[6] = 0x78;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 22");
-    }
-  }
-  if (vweup_cc_temp_int == 23) {
-    data[6] = 0x82;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 23");
-    }
-  }
-  if (vweup_cc_temp_int == 24) {
-    data[6] = 0x8C;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 24");
-    }
-  }
-  if (vweup_cc_temp_int == 25) {
-    data[6] = 0x96;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 25");
-    }
-  }
-  if (vweup_cc_temp_int == 26) {
-    data[6] = 0xA0;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 26");
-    }
-  }
-  if (vweup_cc_temp_int == 27) {
-    data[6] = 0xAA;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 27");
-    }
-  }
-  if (vweup_cc_temp_int == 28) {
-    data[6] = 0xB4;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 28");
-    }
-  }
-  if (vweup_cc_temp_int == 29) {
-    data[6] = 0xBE;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 29");
-    }
-  }
-  if (vweup_cc_temp_int == 30) {
-    data[6] = 0xC8;
-    if (dev_mode) {
-      ESP_LOGI(TAG, "Cabin temperature set: 30");
-    }
-  }
-
-  data[0] = 0xC2;
-  data[1] = 0x1E;
-  data[2] = 0x1E;
-  data[3] = 0x0A;
-  data[4] = 0x00;
-  data[5] = 0x00;
-  data[6] = 0x08;
-  data[7] = 0x4F;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data[0] = 0xC3;
-  data[1] = 0x70;
-  data[2] = 0x74;
-  data[3] = 0x69;
-  data[4] = 0x6F;
-  data[5] = 0x6E;
-  data[6] = 0x65;
-  data[7] = 0x6E;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length, data);
-  }
-
-  data_s[0] = 0x29;
-  data_s[1] = 0x58;
-  data_s[2] = 0x00;
-  data_s[3] = 0x00;
-  if (vweup_enable_write && !dev_mode) {
-    comfBus->WriteStandard(0x69E, length_s, data_s);
-  }
-
-  ESP_LOGI(TAG, "Wrote Climate Control Off Message to Comfort CAN.");
-  vweup_cc_on = false;
-}*/
-
-
-
 bool OvmsVehicleVWeUp::StartCharget26()
 {
   if (!IsT26Ready()) {
@@ -1885,7 +1401,7 @@ bool OvmsVehicleVWeUp::StartCharget26()
     {
       break;
     }
-    ESP_LOGI(TAG, " CUSTOM START CHARGE FUN: %d try",i);
+    ESP_LOGI(TAG, "Custom charge start function (attempt: %d/3)",i);
 
     WriteProfile_0(20,01); // key twenty to change mode byte in basic configuration (check Multiplex PID Document)
       
@@ -1935,7 +1451,7 @@ bool OvmsVehicleVWeUp::StopCharget26()
     {
       break;
     }
-    ESP_LOGI(TAG, " CUSTOM STOP CHARGE FUN: %d try",i);
+    ESP_LOGI(TAG, "Custom charge stop function (attempt: %d/3)",i);
 
     WriteProfile_0(20,01);// key twenty to change mode byte in basic configuration (check Multiplex PID Document)
     
@@ -1981,10 +1497,9 @@ void OvmsVehicleVWeUp::SetChargeCurrent(uint16_t limit)
   {
   if (read_charge_current == limit)
   {
-      ESP_LOGI(TAG, " Inside the break if statement with iteration %d",i);
       break;
   }
-  ESP_LOGI(TAG, " CUSTOM SET CHARGE FUN: %d try WITH READ_CHARGE_CURRENT = %d and LIMIT = %d",i,read_charge_current,limit);
+  ESP_LOGI(TAG, "Set charge current function with current value = %d to be set to = %d (attempt: %d/3)",read_charge_current,limit,i);
 
   WriteProfile_0(21,limit); // key twenty-one to change max current byte in basic configuration (check Multiplex PID Document)
 
@@ -2064,8 +1579,6 @@ OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandSetChargeCurrent(uint16_
   int milli_seconds = 5000;
   while ((clock() < start_time + milli_seconds) || !Set_C_Current_flag)
     ;
-  ESP_LOGI(TAG, "IN CommandSetChargeCurrent AFTER SETCONFIGPARAM");
-
   if((read_charge_current == limit))
     return Success;
   // fallback to default implementation:
@@ -2098,12 +1611,20 @@ OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandClimateControl(bool clim
 {
   ESP_LOGI(TAG, "CommandClimateControl %s", climatecontrolon ? "ON" : "OFF");
 
-  OvmsVehicle::vehicle_command_t res;
-  res = RemoteCommandHandler(climatecontrolon ? ENABLE_CLIMATE_CONTROL : DISABLE_CLIMATE_CONTROL);
-
-  // fallback to default implementation?
-  if (res == NotImplemented) {
-    res = OvmsVehicle::CommandClimateControl(climatecontrolon);
+  //OvmsVehicle::vehicle_command_t res;
+  //res = RemoteCommandHandler(climatecontrolon ? ENABLE_CLIMATE_CONTROL : DISABLE_CLIMATE_CONTROL);
+  if(climatecontrolon)
+  {
+    CCOn();
   }
-  return res;
+  else
+  {
+    CCOff();
+  }
+  // fallback to default implementation?
+  //if (res == NotImplemented) {
+    //res = OvmsVehicle::CommandClimateControl(climatecontrolon);
+  //}
+  //return res;
+  return Success;
 }

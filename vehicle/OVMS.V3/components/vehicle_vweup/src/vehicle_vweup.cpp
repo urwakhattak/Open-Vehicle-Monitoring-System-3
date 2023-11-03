@@ -384,13 +384,13 @@ void OvmsVehicleVWeUp::ConfigChanged(OvmsConfigParam *param)
 
   if (vweup_cc_temp_int_new != vweup_cc_temp_int){
     vweup_cc_temp_int = vweup_cc_temp_int_new;
-    ESP_LOGI(TAG, "CC_temp parameter changed in ConfigChanged");
+    ESP_LOGD(TAG, "CC_temp parameter changed in ConfigChanged");
     if (vweup_enable_t26){
       CCTempSet();}
   }
   if(vweup_charge_current_new != vweup_charge_current)
   {
-  ESP_LOGI(TAG, " ISNSIDE CONFUGCHANEGD FUN with VWEUP_CHARGE_CURRENT_NEW = %d and VWEUP+CHARGE_CURRENT = %d",vweup_charge_current_new,vweup_charge_current);
+    ESP_LOGD(TAG, "Charge current changed in ConfigChanged");
 
     vweup_charge_current = vweup_charge_current_new;
     if (vweup_enable_t26)
@@ -479,7 +479,7 @@ void OvmsVehicleVWeUp::Ticker1(uint32_t ticker)
     float soc = StdMetrics.ms_v_bat_soc->AsFloat();
     int suff_soc = StdMetrics.ms_v_charge_limit_soc->AsInt();
     bool chg_autostop = MyConfig.GetParamValueBool("xvu", "chg_autostop");
-    if (m_chargestate_lastsoc <= suff_soc && soc > suff_soc) {
+    if (m_chargestate_lastsoc <= suff_soc && soc >= suff_soc) {
       if(chg_autostop)
       {
         ESP_LOGI(TAG, "Ticker1: SOC crossed sufficient SOC limit (%d%%), Stopping the charge", suff_soc);
