@@ -165,49 +165,37 @@ void OvmsVehicleVWeUp::RequestProfile_0(uint8_t *data)
 }
 }
 
-
-void OvmsVehicleVWeUp::WriteProfile_0(uint8_t key , uint8_t value)
+void OvmsVehicleVWeUp::Delay_Timer_CallBack()
 {
-  CommandWakeup(); //wakeup the vehicle to be able to communicate with all the ECUs
-  
-    ESP_LOGI(TAG, "WriteProfile_0 function called");
-
-    uint8_t length = 8;
-    unsigned char data[length];
-
-    canbus *comfBus;
-    comfBus = m_can3;
-  
-    data[0] = 0x90;
-    data[1] = 0x04;
-    data[2] = 0x19;
-    data[3] = 0x59;
-    data[4] = 0x15;
-    data[5] = 0x00;
-    data[6] = 0x00;
-    data[7] = 0x01;
-    if (vweup_enable_write && !dev_mode) {
-      comfBus->WriteStandard(0x69E, length, data);
-    }
-     ESP_LOGD(TAG, "Read message sent in WriteProfile_0 function");
-
-    // read response happening automatically
-
-    //add delay
-    clock_t start_time = clock();
-    int milli_seconds = 1000;
-    while (clock() < start_time + milli_seconds)
-      ;
-
-    for(int i = 0; i < length_settings; i+=8 )
+  switch (WriteProfile_0_key)
+  {
+    case 20:
     {
-      ESP_LOGD(TAG, "Current Profile_0: %02x %02x %02x %02x %02x %02x %02x %02x", settings[i+0], settings[i+1], settings[i+2], settings[i+3],settings[i+4], settings[i+5], settings[i+6], settings[i+7]);
+      if (settings[11] != WriteProfile_0_value)
+      {
+          WriteProfile_0_2(WriteProfile_0_key, WriteProfile_0_value);
+      }
+      else
+      {
+        WriteProfile_0_key = 30;
+        CCOn();
+      }
     }
 
-      //send the changed settings
+  }
 
+}
 
-    if(settings[13] != 0 && settings[14] != 0)// && ((key == 21) ? (settings[13] == value) : false))
+void OvmsVehicleVWeUp::WriteProfile_0_2(uint8_t key , uint8_t value)
+{
+  uint8_t length = 8;
+  unsigned char data[length];
+
+  canbus *comfBus;
+  comfBus = m_can3;
+  //send changed settings
+
+if(settings[13] != 0 && settings[14] != 0)// && ((key == 21) ? (settings[13] == value) : false))
     {
       data[0] = 0x90;
       data[1] = 0x20;
@@ -270,6 +258,44 @@ void OvmsVehicleVWeUp::WriteProfile_0(uint8_t key , uint8_t value)
       if (vweup_enable_write && !dev_mode) {
         comfBus->WriteStandard(0x69E, length, data);
       }
+    }
+}
+
+
+void OvmsVehicleVWeUp::WriteProfile_0(uint8_t key , uint8_t value)
+{
+  CommandWakeup(); //wakeup the vehicle to be able to communicate with all the ECUs
+  
+    ESP_LOGI(TAG, "WriteProfile_0 function called");
+
+    uint8_t length = 8;
+    unsigned char data[length];
+
+    canbus *comfBus;
+    comfBus = m_can3;
+  
+    data[0] = 0x90;
+    data[1] = 0x04;
+    data[2] = 0x19;
+    data[3] = 0x59;
+    data[4] = 0x15;
+    data[5] = 0x00;
+    data[6] = 0x00;
+    data[7] = 0x01;
+    if (vweup_enable_write && !dev_mode) {
+      comfBus->WriteStandard(0x69E, length, data);
+    }
+     ESP_LOGD(TAG, "Read message sent in WriteProfile_0 function");
+
+    // read response happening automatically
+
+    //add delay
+    delay_timer = xTimerCreate("VW e-Up Delay/Retry", 1000 / portTICK_PERIOD_MS, pdTRUE, this, Delay_Timer_CallBack);
+    xTimerStart(delay_timer, 0);
+
+    for(int i = 0; i < length_settings; i+=8 )
+    {
+      ESP_LOGD(TAG, "Current Profile_0: %02x %02x %02x %02x %02x %02x %02x %02x", settings[i+0], settings[i+1], settings[i+2], settings[i+3],settings[i+4], settings[i+5], settings[i+6], settings[i+7]);
     }
 
 }
@@ -379,6 +405,19 @@ void OvmsVehicleVWeUp::ccCountdown(TimerHandle_t timer)
   vweup->CCCountdown();
 }
 
+void OvmsVehicleVWeUp::Delay_Timer_CallBack(TimerHandle_t timer)
+{
+  // Workaround for FreeRTOS duplicate timer callback bug
+  // (see https://github.com/espressif/esp-idf/issues/8234)
+  static TickType_t last_tick = 0;
+  TickType_t tick = xTaskGetTickCount();
+  if (tick < last_tick + xTimerGetPeriod(timer) - 3) return;
+  last_tick = tick;
+
+  OvmsVehicleVWeUp *vweup = (OvmsVehicleVWeUp *)pvTimerGetTimerID(timer);
+  vweup->Delay_Timer_CallBack();
+}
+
 void OvmsVehicleVWeUp::T26Init()
 {
   ESP_LOGI(TAG, "Starting connection: T26A (Comfort CAN)");
@@ -415,6 +454,10 @@ void OvmsVehicleVWeUp::T26Init()
   first_char = 0x00;
   vweup_charge_current = 16;
   Set_C_Current_flag = false;
+  WriteProfile_0_key = 0;
+  WriteProfile_0_value = -1;
+
+
   // variables from recieve setting function
   read_cc_temp = 0;
   read_charge_current = 0;
@@ -1237,23 +1280,38 @@ void OvmsVehicleVWeUp::CCCountdown()
   }
 }
 
-
-void OvmsVehicleVWeUp::CCOn() //To turn the Climate Control ON
+void OvmsVehicleVWeUp::CCOn_pre() //To turn the Climate Control ON
 {
     if (!IsT26Ready()) {
     ESP_LOGE(TAG, "CCOn: T26 not ready");
     return;
   }
 
+  WriteProfile_0_key = 20;
+
   bool cc_onbat = MyConfig.GetParamValueBool("xvu", "cc_onbat");
 
   for(int i = 0; i<3 ; i++){
 
   if (cc_onbat)
-    WriteProfile_0(20 , 06); // key twenty to change mode byte in basic configuration (check Multiplex PID Document) and value six for AC allowed on Battery
+  {
+    WriteProfile_0_value = 02;
+    WriteProfile_0(WriteProfile_0_key , WriteProfile_0_value); // key twenty to change mode byte in basic configuration (check Multiplex PID Document) and value six for AC allowed on Battery
+  }
   else
-    WriteProfile_0(20 , 02); // key twenty to change mode byte in basic configuration (check Multiplex PID Document) and value two for AC not allowed on Battery
+  {
+    WriteProfile_0_value = 02;
+    WriteProfile_0(WriteProfile_0_key , WriteProfile_0_value); // key twenty to change mode byte in basic configuration (check Multiplex PID Document) and value two for AC not allowed on Battery
+  }
 
+
+  }
+
+}
+
+void OvmsVehicleVWeUp::CCOn() //To turn the Climate Control ON
+{
+  
   unsigned char data_s[4];
   uint8_t length_s;
   length_s = 4;
@@ -1275,17 +1333,14 @@ void OvmsVehicleVWeUp::CCOn() //To turn the Climate Control ON
     vweup_cc_turning_on = false;
     StandardMetrics.ms_v_env_charging12v->SetValue(true);
     StandardMetrics.ms_v_env_aux12v->SetValue(true);
-    break;
   }
-  //add delay
-  clock_t start_time = clock();
-  int milli_seconds = 1000;
-  while (clock() < start_time + milli_seconds)
-      ;
-
-  }
+  xTimerStop(delay_timer , 0);
+  xTimerDelete(delay_timer , 0);
+  delay_timer  = NULL;
 
 }
+
+
 
 void OvmsVehicleVWeUp::CCTempSet() //to send the can message to set the configured cabin temperature
 {
@@ -1593,9 +1648,12 @@ OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandHomelink(int button, int
 
   OvmsVehicle::vehicle_command_t res = NotImplemented;
   if (button == 0) {
+        CCOn();
     res = RemoteCommandHandler(ENABLE_CLIMATE_CONTROL);
   }
   else if (button == 1) {
+      CCOff();
+
     res = RemoteCommandHandler(DISABLE_CLIMATE_CONTROL);
   }
 
@@ -1613,18 +1671,21 @@ OvmsVehicle::vehicle_command_t OvmsVehicleVWeUp::CommandClimateControl(bool clim
 
   //OvmsVehicle::vehicle_command_t res;
   //res = RemoteCommandHandler(climatecontrolon ? ENABLE_CLIMATE_CONTROL : DISABLE_CLIMATE_CONTROL);
+
   if(climatecontrolon)
   {
-    CCOn();
+    CCOn_pre();
+    return StandardMetrics.ms_v_env_hvac->AsBool() ? Success : Fail;
   }
   else
   {
     CCOff();
+    return StandardMetrics.ms_v_env_hvac->AsBool() ? Success : Fail;
+
   }
   // fallback to default implementation?
   //if (res == NotImplemented) {
     //res = OvmsVehicle::CommandClimateControl(climatecontrolon);
   //}
   //return res;
-  return Success;
 }

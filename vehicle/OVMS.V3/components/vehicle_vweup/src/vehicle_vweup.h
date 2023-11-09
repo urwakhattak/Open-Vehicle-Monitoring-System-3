@@ -263,17 +263,23 @@ public:
   void SendOcuHeartbeat();
   void CCCountdown();
   void CCOn();
+  void CCOn_pre();
   void CCOnP();
   void CCOff();
   void CCTempSet();
   static void ccCountdown(TimerHandle_t timer);
   static void sendOcuHeartbeat(TimerHandle_t timer);
+  static void Delay_Timer_CallBack(TimerHandle_t timer);
   bool StartCharget26();
   bool StopCharget26();
   void SetChargeCurrent(uint16_t limit);
   void RequestProfile_0(uint8_t *data);
   void WriteProfile_0(uint8_t key , uint8_t value);
   void ResetProfile_0();
+  void Delay_Timer_CallBack();
+  void WriteProfile_0_2(uint8_t key , uint8_t value);
+
+
 
 
 
@@ -316,6 +322,8 @@ public:
   uint8_t first_char;
   uint8_t settings[length_settings];
   bool Set_C_Current_flag;
+  int WriteProfile_0_key;
+  int WriteProfile_0_value;
 
 
   //for values read from profile by read steeings function
@@ -326,6 +334,7 @@ private:
   RemoteCommand vweup_remote_command; // command to send, see RemoteCommandTimer()
   TimerHandle_t m_sendOcuHeartbeat;
   TimerHandle_t m_ccCountdown;
+  TimerHandle_t delay_timer;
 
 
   // --------------------------------------------------------------------------
